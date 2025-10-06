@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile Data Augmentation Simulator</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- JSZip + FileSaver -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-6">
+
+  <div class="w-full max-w-6xl bg-white rounded-lg shadow-lg p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Left side: Canvas + Upload -->
+    <div class="flex flex-col items-center space-y-6">
+      <h1 class="text-2xl font-bold text-center">Data Augmentation Tool</h1>
+
+      <!-- Image Upload -->
+      <input type="file" id="imageUpload" accept="image/*"
+        class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 
+        file:rounded-full file:border-0 file:text-sm file:font-semibold 
+        file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+
+      <!-- Canvas -->
+      <canvas id="augmentedCanvas" class="border border-gray-300 rounded-lg" width="300" height="300"></canvas>
+    </div>
+
+    <!-- Right side: Controls -->
+    <div class="space-y-6">
+      <!-- Rotation -->
+      <div>
+        <label for="rotationSlider" class="block text-sm font-medium text-gray-700">Rotation (0° to 360°)</label>
+        <input type="range" id="rotationSlider" min="0" max="360" value="0" class="w-full">
+      </div>
+
+      <!-- Horizontal Flip -->
+      <div>
+        <button id="horizontalFlipToggle" class="w-full py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+          Toggle Horizontal Flip (Off)
+        </button>
+      </div>
+
+      <!-- Vertical Flip -->
+      <div>
+        <button id="verticalFlipToggle" class="w-full py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+          Toggle Vertical Flip (Off)
+        </button>
+      </div>
+
+      <!-- Brightness -->
+      <div>
+        <label for="brightnessSlider" class="block text-sm font-medium text-gray-700">Brightness (0% to 200%)</label>
+        <input type="range" id="brightnessSlider" min="0" max="200" value="100" class="w-full">
+      </div>
+
+      <!-- Contrast -->
+      <div>
+        <label for="contrastSlider" class="block text-sm font-medium text-gray-700">Contrast (0% to 200%)</label>
+        <input type="range" id="contrastSlider" min="0" max="200" value="100" class="w-full">
+      </div>
+
+      <!-- Zoom -->
+      <div>
+        <label for="zoomSlider" class="block text-sm font-medium text-gray-700">Zoom (50% to 150%)</label>
+        <input type="range" id="zoomSlider" min="50" max="150" value="100" class="w-full">
+      </div>
+
+      <!-- Buttons -->
+      <div class="space-y-2">
+        <button id="downloadBtn" class="w-full py-2 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600">
+          Download Current Image
+        </button>
+        <button id="download50Btn" class="w-full py-2 px-4 bg-purple-500 text-white rounded-lg hover:bg-purple-600">
+          Download 50 Variations
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // DOM Elements
+    const imageUpload = document.getElementById('imageUpload');
+    const canvas = document.getElementById('augmentedCanvas');
+    const ctx = canvas.getContext('2d');
+    const rotationSlider = document.getElementById('rotationSlider');
+    const horizontalFlipToggle = document.getElementById('horizontalFlipToggle');
+    const verticalFlipToggle = document.getElementById('verticalFlipToggle');
+    const brightnessSlider = document.getElementById('brightnessSlider');
+    const contrastSlider = document.getElementById('contrastSlider');
+    const zoomSlider = document.getElementById('zoomSlider');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const download50Btn = document.getElementById('download50Btn');
+
+    // State
+    let originalImage = null;
+    let isHorizontalFlipped = false;
+    let isVerticalFlipped = false;
+    let rotation = 0;
+    let brightness = 100;
+    let contrast = 100;
+    let zoom = 100;
+
+    // Draw augmented image
+    function drawAugmentedImage() {
+      if (!originalImage) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(rotation * Math.PI / 180);
+      ctx.scale(isHorizontalFlipped ? -1 : 1, isVerticalFlipped ? -1 : 1);
+      ctx.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
+
+      const imgWidth = originalImage.width;
+      const imgHeight = originalImage.height;
+      const zoomFactor = zoom / 100;
+      const scale = Math.min(canvas.width / (imgWidth * zoomFactor), canvas.height / (imgHeight * zoomFactor)) * zoomFactor;
+      const drawWidth = imgWidth * scale;
+      const drawHeight = imgHeight * scale;
+
+      ctx.drawImage(originalImage, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+      ctx.restore();
+    }
+
+    // Upload
+    imageUpload.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          originalImage = new Image();
+          originalImage.onload = () => drawAugmentedImage();
+          originalImage.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Controls
+    rotationSlider.addEventListener('input', e => { rotation = +e.target.value; drawAugmentedImage(); });
+    horizontalFlipToggle.addEventListener('click', () => {
+      isHorizontalFlipped = !isHorizontalFlipped;
+      horizontalFlipToggle.textContent = `Toggle Horizontal Flip (${isHorizontalFlipped ? 'On' : 'Off'})`;
+      drawAugmentedImage();
+    });
+    verticalFlipToggle.addEventListener('click', () => {
+      isVerticalFlipped = !isVerticalFlipped;
+      verticalFlipToggle.textContent = `Toggle Vertical Flip (${isVerticalFlipped ? 'On' : 'Off'})`;
+      drawAugmentedImage();
+    });
+    brightnessSlider.addEventListener('input', e => { brightness = +e.target.value; drawAugmentedImage(); });
+    contrastSlider.addEventListener('input', e => { contrast = +e.target.value; drawAugmentedImage(); });
+    zoomSlider.addEventListener('input', e => { zoom = +e.target.value; drawAugmentedImage(); });
+
+    // Download current
+    downloadBtn.addEventListener('click', () => {
+      if (!originalImage) { alert("Please upload an image first!"); return; }
+      const link = document.createElement('a');
+      link.download = 'augmented_image.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+
+    // Random helper
+    function getRandom(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    // Download 50 variations
+    download50Btn.addEventListener('click', async () => {
+      if (!originalImage) { alert("Please upload an image first!"); return; }
+      const zip = new JSZip();
+
+      for (let i = 0; i < 50; i++) {
+        rotation = getRandom(0, 360);
+        isHorizontalFlipped = Math.random() > 0.5;
+        isVerticalFlipped = Math.random() > 0.5;
+        brightness = getRandom(50, 150);
+        contrast = getRandom(50, 150);
+        zoom = getRandom(75, 125);
+
+        drawAugmentedImage();
+
+        const dataUrl = canvas.toDataURL("image/png");
+        const imgData = dataUrl.split(",")[1];
+        zip.file(`augmented_${i + 1}.png`, imgData, { base64: true });
+      }
+
+      const content = await zip.generateAsync({ type: "blob" });
+      saveAs(content, "augmented_images.zip");
+    });
+  </script>
+</body>
+</html>
